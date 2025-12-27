@@ -1,0 +1,86 @@
+.data-grid-container {
+  overflow-x: auto;
+}
+
+.data-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.data-grid th,
+.data-grid td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.data-grid th {
+  background-color: var(--color-background);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.data-grid tbody tr:hover {
+  background-color: var(--color-background);
+}
+
+.data-grid td.editable {
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.data-grid td.editable:hover {
+  background-color: rgba(37, 99, 235, 0.05);
+}
+
+.data-grid td.editing {
+  padding: 0;
+  background-color: white;
+}
+
+.cell-input {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 2px solid var(--color-primary);
+  border-radius: 0;
+  font-size: inherit;
+  font-family: inherit;
+  background-color: white;
+}
+
+.cell-input:focus {
+  outline: none;
+}
+
+.cell-input:disabled {
+  background-color: var(--color-background);
+}
+
+.cell-value {
+  display: block;
+  min-height: 1.5em;
+}
+
+.actions-col {
+  width: 100px;
+  text-align: center;
+}
+
+.totals-row {
+  background-color: var(--color-background);
+  font-weight: 600;
+}
+
+.totals-row td {
+  border-top: 2px solid var(--color-border);
+}
+
+@media (max-width: 768px) {
+  .data-grid th,
+  .data-grid td {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-xs);
+  }
+}

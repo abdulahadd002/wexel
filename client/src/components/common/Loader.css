@@ -1,0 +1,41 @@
+.loader {
+  border-radius: 50%;
+  border-style: solid;
+  border-color: var(--color-primary);
+  border-top-color: transparent;
+  animation: spin 0.75s linear infinite;
+}
+
+.loader-sm {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+.loader-md {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
+.loader-lg {
+  width: 48px;
+  height: 48px;
+  border-width: 4px;
+}
+
+.loader-fullscreen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-background);
+  z-index: 9999;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
