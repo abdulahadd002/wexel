@@ -135,7 +135,7 @@ export function HomePage() {
           <div className="empty-state">
             <p>No bills found for this date.</p>
             <p className="empty-state-hint">
-              Process images from the Photos page to add bills.
+              Go to Upload page to add bill images.
             </p>
           </div>
         ) : (

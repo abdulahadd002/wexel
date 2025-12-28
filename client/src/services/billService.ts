@@ -2,7 +2,6 @@ import api from './api';
 import { Bill, ApiResponse } from '../types';
 
 interface BillFilters {
-  contactId?: string;
   date?: string;
   startDate?: string;
   endDate?: string;
@@ -21,11 +20,17 @@ export const billService = {
     return response.data.data!.bill;
   },
 
-  async processBill(imageUrl: string, contactId: string, billDate?: string): Promise<Bill> {
-    const response = await api.post<ApiResponse<{ bill: Bill }>>('/bills/process', {
-      imageUrl,
-      contactId,
-      billDate,
+  async uploadBill(file: File, billDate?: string): Promise<Bill> {
+    const formData = new FormData();
+    formData.append('image', file);
+    if (billDate) {
+      formData.append('billDate', billDate);
+    }
+
+    const response = await api.post<ApiResponse<{ bill: Bill }>>('/bills/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     });
     return response.data.data!.bill;
   },

@@ -1,10 +1,10 @@
 # Wexel
 
-A full-stack application for extracting handwritten text from WhatsApp bill images using AI-powered OCR and managing sales data.
+A full-stack application for extracting handwritten text from bill images using AI-powered OCR and managing sales data.
 
 ## Features
 
-- **WhatsApp Integration**: Connect to WhatsApp Cloud API to receive bill images from selected contacts
+- **Image Upload**: Upload photos of handwritten bills directly
 - **AI-Powered OCR**: Uses OpenAI GPT-4 Vision to extract handwritten text in English and Urdu
 - **Dynamic Field Extraction**: Automatically detects and extracts all fields from bills
 - **Excel-like Editing**: Edit extracted data directly in a spreadsheet-style interface
@@ -28,7 +28,6 @@ A full-stack application for extracting handwritten text from WhatsApp bill imag
 - PostgreSQL database
 - JWT authentication
 - OpenAI API for OCR
-- WhatsApp Cloud API
 - ExcelJS for exports
 
 ## Prerequisites
@@ -36,7 +35,6 @@ A full-stack application for extracting handwritten text from WhatsApp bill imag
 - Node.js 18+
 - PostgreSQL 15+
 - Docker (optional, for PostgreSQL)
-- WhatsApp Business Account with Cloud API access
 - OpenAI API key
 
 ## Getting Started
@@ -76,9 +74,6 @@ Edit `.env` with your credentials:
 ```env
 DATABASE_URL=postgresql://wexel:wexel123@localhost:5432/wexel
 JWT_SECRET=your-secure-jwt-secret
-WHATSAPP_ACCESS_TOKEN=your-whatsapp-token
-WHATSAPP_PHONE_NUMBER_ID=your-phone-id
-WHATSAPP_VERIFY_TOKEN=your-verify-token
 OPENAI_API_KEY=your-openai-key
 ```
 
@@ -106,13 +101,13 @@ The app will be available at:
 - Frontend: http://localhost:5173
 - Backend: http://localhost:3001
 
-## WhatsApp Setup
+## Usage
 
-1. Create a WhatsApp Business Account at [Meta for Developers](https://developers.facebook.com/)
-2. Set up a WhatsApp Cloud API app
-3. Configure the webhook URL to point to `https://your-domain.com/api/whatsapp/webhook`
-4. Use the verification token you set in `.env`
-5. Subscribe to the `messages` webhook field
+1. **Register/Login**: Create an account or sign in
+2. **Upload Bills**: Go to Upload page and upload photos of handwritten bills
+3. **View Data**: See extracted data on the Sheets page
+4. **Edit Data**: Click on any cell to edit the extracted values
+5. **Export**: Download daily sheets as Excel files
 
 ## API Endpoints
 
@@ -122,15 +117,9 @@ The app will be available at:
 - `GET /api/auth/profile` - Get current user
 - `POST /api/auth/logout` - Logout
 
-### Contacts
-- `GET /api/contacts` - List all contacts
-- `POST /api/contacts` - Add contact
-- `PUT /api/contacts/:id` - Update contact
-- `DELETE /api/contacts/:id` - Delete contact
-
 ### Bills
 - `GET /api/bills` - List bills (with filters)
-- `POST /api/bills/process` - Process image with OCR
+- `POST /api/bills/upload` - Upload and process image
 - `PUT /api/bills/:id` - Update bill data
 - `DELETE /api/bills/:id` - Delete bill
 
@@ -139,12 +128,6 @@ The app will be available at:
 - `GET /api/sheets/:date` - Get sheet by date
 - `GET /api/sheets/:date/export` - Export to Excel
 - `GET /api/sheets/gross-sales` - Get sales summary
-
-### WhatsApp
-- `GET /api/whatsapp/webhook` - Webhook verification
-- `POST /api/whatsapp/webhook` - Receive messages
-- `GET /api/whatsapp/photos` - Get all photos
-- `GET /api/whatsapp/photos/:contactId` - Get contact photos
 
 ## Project Structure
 
@@ -167,6 +150,7 @@ wexel/
 │   │   ├── routes/         # API routes
 │   │   └── services/       # Business logic
 │   ├── prisma/             # Database schema
+│   ├── uploads/            # Uploaded images
 │   └── ...
 ├── docker-compose.yml      # PostgreSQL container
 └── README.md

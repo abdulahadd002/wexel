@@ -2,15 +2,21 @@ import ExcelJS from 'exceljs';
 
 interface BillData {
   id: string;
-  imageUrl: string;
+  imagePath: string;
   extractedData: any;
   totalAmount: any;
   billDate: Date;
-  contact: {
-    displayName: string;
-    phoneNumber: string;
-  };
 }
+
+// Define the fixed column order for bills/invoices
+const INVOICE_COLUMNS = [
+  'partyName',
+  'billNo',
+  'billDate',
+  'total',
+  'discount',
+  'netTotal',
+];
 
 export async function generateExcelSheet(
   bills: BillData[],
@@ -21,133 +27,170 @@ export async function generateExcelSheet(
   workbook.created = new Date();
 
   const dateStr = sheetDate.toISOString().split('T')[0];
-  const worksheet = workbook.addWorksheet(`Bills - ${dateStr}`);
 
-  const allFields = new Set<string>();
-  allFields.add('Contact');
-  allFields.add('Phone');
-  allFields.add('Image');
-  allFields.add('Total');
+  // Separate bills by document type
+  const invoices = bills.filter((b) => b.extractedData?.documentType !== 'ledger');
+  const ledgers = bills.filter((b) => b.extractedData?.documentType === 'ledger');
+
+  // === BILLS SHEET (for invoices and simple ledger entries) ===
+  const billsSheet = workbook.addWorksheet(`Bills - ${dateStr}`);
+  billsSheet.columns = [
+    { header: 'Party Name', key: 'partyName', width: 25 },
+    { header: 'Bill No', key: 'billNo', width: 12 },
+    { header: 'Bill Date', key: 'billDate', width: 12 },
+    { header: 'Total', key: 'total', width: 15 },
+    { header: 'Discount', key: 'discount', width: 12 },
+    { header: 'Net Total', key: 'netTotal', width: 15 },
+  ];
+
+  applyHeaderStyle(billsSheet.getRow(1));
 
   for (const bill of bills) {
-    if (bill.extractedData && typeof bill.extractedData === 'object') {
-      Object.keys(bill.extractedData).forEach((key) => {
-        if (key !== 'total' && key !== 'items') {
-          allFields.add(key);
-        }
+    const data = bill.extractedData || {};
+
+    // For ledger type, extract bill info from transactions
+    if (data.documentType === 'ledger') {
+      // Find the bill entry in transactions (debit entries)
+      const billTransaction = data.transactions?.find((t: any) =>
+        t.particulars?.toLowerCase().includes('bill') && t.debit > 0
+      );
+
+      billsSheet.addRow({
+        partyName: data.partyName || '',
+        billNo: billTransaction?.particulars?.match(/#?\d+/)?.[0] || '',
+        billDate: billTransaction?.date || '',
+        total: data.netTotal || billTransaction?.debit || 0,
+        discount: 0,
+        netTotal: data.netTotal || billTransaction?.debit || Number(bill.totalAmount) || 0,
+      });
+    } else {
+      // Invoice type
+      billsSheet.addRow({
+        partyName: data.partyName || data.supplierName || '',
+        billNo: data.billNo || '',
+        billDate: data.billDate || '',
+        total: data.total || 0,
+        discount: data.discount || 0,
+        netTotal: data.netTotal || Number(bill.totalAmount) || 0,
       });
     }
   }
 
-  const columns = Array.from(allFields);
-  worksheet.columns = columns.map((col) => ({
-    header: formatColumnHeader(col),
-    key: col,
-    width: col === 'Image' ? 40 : 20,
-  }));
+  // Add totals row
+  const totalNetTotal = bills.reduce(
+    (sum, bill) => sum + (Number(bill.extractedData?.netTotal) || Number(bill.totalAmount) || 0),
+    0
+  );
+  const totalDiscount = bills.reduce(
+    (sum, bill) => sum + (Number(bill.extractedData?.discount) || 0),
+    0
+  );
 
-  const headerRow = worksheet.getRow(1);
-  headerRow.font = { bold: true };
-  headerRow.fill = {
+  const totalsRow = billsSheet.addRow({
+    partyName: 'TOTAL',
+    billNo: '',
+    billDate: '',
+    total: '',
+    discount: totalDiscount,
+    netTotal: totalNetTotal,
+  });
+  totalsRow.font = { bold: true };
+  totalsRow.fill = {
     type: 'pattern',
     pattern: 'solid',
-    fgColor: { argb: 'FF4472C4' },
+    fgColor: { argb: 'FFE2EFDA' },
   };
-  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
 
-  for (const bill of bills) {
-    const rowData: any = {
-      Contact: bill.contact.displayName,
-      Phone: bill.contact.phoneNumber,
-      Image: bill.imageUrl,
-      Total: bill.totalAmount ? Number(bill.totalAmount) : '',
-    };
-
-    if (bill.extractedData && typeof bill.extractedData === 'object') {
-      Object.entries(bill.extractedData).forEach(([key, value]) => {
-        if (key !== 'total' && key !== 'items' && allFields.has(key)) {
-          rowData[key] = formatCellValue(value);
-        }
-      });
-    }
-
-    worksheet.addRow(rowData);
-  }
-
+  // === ITEMS SHEET (for invoices with line items) ===
   if (bills.some((b) => b.extractedData?.items?.length > 0)) {
     const itemsSheet = workbook.addWorksheet(`Items - ${dateStr}`);
     itemsSheet.columns = [
-      { header: 'Bill ID', key: 'billId', width: 15 },
-      { header: 'Contact', key: 'contact', width: 20 },
-      { header: 'Item Name', key: 'name', width: 30 },
-      { header: 'Quantity', key: 'quantity', width: 12 },
-      { header: 'Price', key: 'price', width: 15 },
+      { header: 'Party Name', key: 'partyName', width: 25 },
+      { header: 'Bill No', key: 'billNo', width: 12 },
+      { header: 'Item', key: 'item', width: 30 },
+      { header: 'Qty', key: 'qty', width: 10 },
+      { header: 'Unit Price', key: 'unitPrice', width: 15 },
+      { header: 'Amount', key: 'amount', width: 15 },
     ];
 
-    const itemsHeaderRow = itemsSheet.getRow(1);
-    itemsHeaderRow.font = { bold: true };
-    itemsHeaderRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF4472C4' },
-    };
-    itemsHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    applyHeaderStyle(itemsSheet.getRow(1));
 
     for (const bill of bills) {
-      const items = bill.extractedData?.items || [];
+      const data = bill.extractedData || {};
+      const items = data.items || [];
+      const partyName = data.partyName || data.supplierName || '';
+      const billNo = data.billNo || '';
+
       for (const item of items) {
         itemsSheet.addRow({
-          billId: bill.id.slice(0, 8),
-          contact: bill.contact.displayName,
-          name: item.name || '',
-          quantity: item.quantity || '',
-          price: item.price || '',
+          partyName,
+          billNo,
+          item: item.item || item.name || '',
+          qty: item.qty || item.quantity || 0,
+          unitPrice: item.unitPrice || item.price || 0,
+          amount: item.amount || 0,
         });
       }
     }
   }
 
+  // === LEDGER TRANSACTIONS SHEET (for ledger documents) ===
+  if (ledgers.length > 0) {
+    const ledgerSheet = workbook.addWorksheet(`Ledger - ${dateStr}`);
+    ledgerSheet.columns = [
+      { header: 'Party Name', key: 'partyName', width: 25 },
+      { header: 'Date', key: 'date', width: 12 },
+      { header: 'Particulars', key: 'particulars', width: 25 },
+      { header: 'Debit (Rs)', key: 'debit', width: 15 },
+      { header: 'Credit (Rs)', key: 'credit', width: 15 },
+      { header: 'Balance (Rs)', key: 'balance', width: 15 },
+    ];
+
+    applyHeaderStyle(ledgerSheet.getRow(1));
+
+    for (const bill of ledgers) {
+      const data = bill.extractedData || {};
+      const transactions = data.transactions || [];
+      const partyName = data.partyName || '';
+
+      for (const txn of transactions) {
+        ledgerSheet.addRow({
+          partyName,
+          date: txn.date || '',
+          particulars: txn.particulars || '',
+          debit: txn.debit || 0,
+          credit: txn.credit || 0,
+          balance: txn.balance || 0,
+        });
+      }
+    }
+  }
+
+  // === SUMMARY SHEET ===
   const summarySheet = workbook.addWorksheet('Summary');
   summarySheet.columns = [
-    { header: 'Metric', key: 'metric', width: 25 },
+    { header: 'Metric', key: 'metric', width: 30 },
     { header: 'Value', key: 'value', width: 20 },
   ];
 
-  const summaryHeaderRow = summarySheet.getRow(1);
-  summaryHeaderRow.font = { bold: true };
-  summaryHeaderRow.fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF4472C4' },
-  };
-  summaryHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-
-  const grossSales = bills.reduce(
-    (sum, bill) => sum + (Number(bill.totalAmount) || 0),
-    0
-  );
+  applyHeaderStyle(summarySheet.getRow(1));
 
   summarySheet.addRow({ metric: 'Date', value: dateStr });
-  summarySheet.addRow({ metric: 'Total Bills', value: bills.length });
-  summarySheet.addRow({ metric: 'Gross Sales', value: grossSales });
+  summarySheet.addRow({ metric: 'Total Documents', value: bills.length });
+  summarySheet.addRow({ metric: 'Invoice Documents', value: invoices.length });
+  summarySheet.addRow({ metric: 'Ledger Documents', value: ledgers.length });
+  summarySheet.addRow({ metric: 'Total Discount', value: totalDiscount });
+  summarySheet.addRow({ metric: 'Gross Sales (Net Total)', value: totalNetTotal });
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }
 
-function formatColumnHeader(key: string): string {
-  return key
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, (str) => str.toUpperCase())
-    .trim();
-}
-
-function formatCellValue(value: any): string | number {
-  if (value === null || value === undefined) {
-    return '';
-  }
-  if (typeof value === 'object') {
-    return JSON.stringify(value);
-  }
-  return value;
+function applyHeaderStyle(row: ExcelJS.Row) {
+  row.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  row.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF4472C4' },
+  };
 }

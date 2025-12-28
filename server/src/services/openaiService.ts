@@ -23,21 +23,39 @@ export async function extractBillData(imageUrl: string): Promise<ExtractedBillDa
       messages: [
         {
           role: 'system',
-          content: `You are an expert at extracting information from handwritten bills and receipts.
-You can read both English and Urdu handwriting.
+          content: `You are an expert OCR system for reading business documents. You can read printed and handwritten text in English and Urdu.
 
-Your task is to analyze the image and extract ALL fields present on the bill.
-Return the data as a JSON object with the following guidelines:
+THERE ARE TWO DOCUMENT TYPES - IDENTIFY WHICH ONE AND EXTRACT ACCORDINGLY:
 
-1. Always try to find and include a "total" field with the total amount as a number
-2. Always try to find and include a "date" field if present
-3. Extract "items" as an array if there are line items, each with name, quantity, and price if available
-4. Include ANY other fields you can identify (vendor name, address, invoice number, tax, etc.)
-5. Use descriptive field names in camelCase
-6. Convert all monetary values to numbers (not strings)
-7. If you can't read something clearly, make your best attempt and include it
+=== TYPE 1: INVOICE/BILL (has "Supplier Name:", "Bill No:", "Bill Date:") ===
+Extract these fields:
+- "documentType": "invoice"
+- "partyName": The supplier/vendor name (from "Supplier Name:" field)
+- "billNo": Bill number (from "Bill No:" field, e.g., "3", "1", "#035")
+- "billDate": Date (from "Bill Date:" field, format DD-MM-YY, e.g., "20-12-25")
+- "items": Array of line items from the table:
+  [{"item": "17MM PVC Golden", "qty": 5, "unitPrice": 10400, "amount": 52000}, ...]
+- "total": Sum total before discount (number)
+- "discount": Discount amount (number, default 0)
+- "netTotal": Final amount after discount (number) - MOST IMPORTANT
 
-Return ONLY valid JSON, no markdown or explanation.`,
+=== TYPE 2: LEDGER/ACCOUNT STATEMENT (has "Party Name:" header with Date/Particulars/Debit/Credit/Balance columns) ===
+Extract these fields:
+- "documentType": "ledger"
+- "partyName": The party name from the header (e.g., "Waseem Wood Kabal", "Bilal Wood Matta")
+- "transactions": Array of all rows:
+  [{"date": "01-12-25", "particulars": "Bill #010", "debit": 179800, "credit": 0, "balance": 179800}, ...]
+- "netTotal": The final balance (last row's Balance value) or total debit if it's a single bill entry
+
+CRITICAL RULES:
+1. ALL monetary values must be NUMBERS without commas (179800 not "179,800")
+2. Read EVERY row in tables - don't skip any
+3. For ledger: "Bill #xxx" entries are debits, "Cash Received"/"Online Receipt"/"Cheque #xxx" are credits
+4. For dates: preserve format as DD-MM-YY (e.g., "10-12-25")
+5. If a cell is empty, use 0 for numbers or "" for text
+6. For ledger documents, extract the DEBIT amount from bill entries as netTotal
+
+Return ONLY valid JSON. No markdown, no explanation.`,
         },
         {
           role: 'user',
@@ -51,13 +69,24 @@ Return ONLY valid JSON, no markdown or explanation.`,
             },
             {
               type: 'text',
-              text: 'Please extract all information from this handwritten bill/receipt. Return the data as JSON.',
+              text: `Analyze this document image carefully.
+
+STEP 1: Determine document type
+- If you see "Supplier Name:", "Bill No:", "Bill Date:" with an items table → TYPE: invoice
+- If you see "Party Name:" header with Date/Particulars/Debit/Credit/Balance columns → TYPE: ledger
+
+STEP 2: Extract ALL data according to the document type
+
+STEP 3: Return JSON with appropriate fields
+
+For INVOICE type, I need: partyName, billNo, billDate, items[], total, discount, netTotal
+For LEDGER type, I need: partyName, transactions[], netTotal (use debit amount from bill entry)`,
             },
           ],
         },
       ],
-      max_tokens: 2000,
-      temperature: 0.1,
+      max_tokens: 3000,
+      temperature: 0,
     });
 
     const content = response.choices[0]?.message?.content;

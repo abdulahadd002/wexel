@@ -14,34 +14,16 @@ model User {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  contacts    WhatsAppContact[]
   bills       Bill[]
   dailySheets DailySheet[]
 
   @@map("users")
 }
 
-model WhatsAppContact {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  phoneNumber String   @map("phone_number")
-  displayName String   @map("display_name")
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bills Bill[]
-
-  @@unique([userId, phoneNumber])
-  @@map("whatsapp_contacts")
-}
-
 model Bill {
   id            String   @id @default(uuid())
   userId        String   @map("user_id")
-  contactId     String   @map("contact_id")
-  imageUrl      String   @map("image_url")
+  imagePath     String   @map("image_path")
   extractedData Json     @default("{}") @map("extracted_data")
   totalAmount   Decimal? @map("total_amount") @db.Decimal(12, 2)
   billDate      DateTime @map("bill_date") @db.Date
@@ -49,8 +31,7 @@ model Bill {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  contact WhatsAppContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, billDate])
   @@map("bills")

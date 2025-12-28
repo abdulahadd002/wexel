@@ -26,30 +26,15 @@ export function DataGrid({ bills, onUpdate }: DataGridProps) {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    // Fixed column order matching the bill format
     const cols: Column[] = [
-      { key: 'contact', label: 'Contact', type: 'text', editable: false },
+      { key: 'partyName', label: 'Party Name', type: 'text', editable: true },
+      { key: 'billNo', label: 'Bill No', type: 'text', editable: true },
+      { key: 'billDate', label: 'Bill Date', type: 'text', editable: true },
       { key: 'total', label: 'Total', type: 'number', editable: true },
+      { key: 'discount', label: 'Discount', type: 'number', editable: true },
+      { key: 'netTotal', label: 'Net Total', type: 'number', editable: true },
     ];
-
-    const dynamicFields = new Set<string>();
-    bills.forEach((bill) => {
-      if (bill.extractedData && typeof bill.extractedData === 'object') {
-        Object.keys(bill.extractedData).forEach((key) => {
-          if (key !== 'total' && key !== 'items') {
-            dynamicFields.add(key);
-          }
-        });
-      }
-    });
-
-    dynamicFields.forEach((field) => {
-      cols.push({
-        key: field,
-        label: formatLabel(field),
-        type: 'text',
-        editable: true,
-      });
-    });
 
     setColumns(cols);
   }, [bills]);
@@ -62,13 +47,33 @@ export function DataGrid({ bills, onUpdate }: DataGridProps) {
   };
 
   const getCellValue = (bill: Bill, key: string): string => {
-    if (key === 'contact') {
-      return bill.contact.displayName;
+    const data = bill.extractedData || {};
+
+    // Handle ledger documents - extract bill info from transactions
+    if (data.documentType === 'ledger') {
+      const billTxn = data.transactions?.find((t: any) =>
+        t.particulars?.toLowerCase().includes('bill') && t.debit > 0
+      );
+
+      if (key === 'partyName') return data.partyName || '';
+      if (key === 'billNo') return billTxn?.particulars?.match(/#?\d+/)?.[0] || '';
+      if (key === 'billDate') return billTxn?.date || '';
+      if (key === 'total') return (data.netTotal || billTxn?.debit || 0).toString();
+      if (key === 'discount') return '0';
+      if (key === 'netTotal') return (data.netTotal || billTxn?.debit || bill.totalAmount || 0).toString();
     }
-    if (key === 'total') {
-      return bill.totalAmount?.toString() || '';
+
+    // Handle invoice documents
+    if (key === 'partyName') {
+      return data.partyName || data.supplierName || '';
     }
-    return bill.extractedData?.[key]?.toString() || '';
+    if (key === 'netTotal') {
+      return (data.netTotal || bill.totalAmount || '').toString();
+    }
+    if (data[key] !== undefined) {
+      return data[key]?.toString() || '';
+    }
+    return '';
   };
 
   const startEditing = (billId: string, field: string, currentValue: string) => {
@@ -89,19 +94,23 @@ export function DataGrid({ bills, onUpdate }: DataGridProps) {
       const bill = bills.find((b) => b.id === editingCell.billId);
       if (!bill) return;
 
-      if (editingCell.field === 'total') {
-        await billService.updateBill(editingCell.billId, {
-          totalAmount: parseFloat(editValue) || 0,
-        });
-      } else {
-        const newExtractedData = {
-          ...bill.extractedData,
-          [editingCell.field]: editValue,
-        };
-        await billService.updateBill(editingCell.billId, {
-          extractedData: newExtractedData,
-        });
+      const field = editingCell.field;
+      const isNumericField = ['total', 'discount', 'netTotal'].includes(field);
+      const value = isNumericField ? parseFloat(editValue) || 0 : editValue;
+
+      // Update extractedData with the new value
+      const newExtractedData = {
+        ...bill.extractedData,
+        [field]: value,
+      };
+
+      // If editing netTotal, also update totalAmount for gross sales calculation
+      const updateData: any = { extractedData: newExtractedData };
+      if (field === 'netTotal') {
+        updateData.totalAmount = value;
       }
+
+      await billService.updateBill(editingCell.billId, updateData);
 
       onUpdate();
       cancelEditing();
@@ -178,7 +187,7 @@ export function DataGrid({ bills, onUpdate }: DataGridProps) {
                       />
                     ) : (
                       <span className="cell-value">
-                        {col.key === 'total' && value
+                        {['total', 'discount', 'netTotal'].includes(col.key) && value
                           ? parseFloat(value).toLocaleString()
                           : value || '-'}
                       </span>
@@ -200,19 +209,57 @@ export function DataGrid({ bills, onUpdate }: DataGridProps) {
         </tbody>
         <tfoot>
           <tr className="totals-row">
-            <td>
-              <strong>Total</strong>
-            </td>
-            <td>
-              <strong>
-                {bills
-                  .reduce((sum, bill) => sum + (bill.totalAmount || 0), 0)
-                  .toLocaleString()}
-              </strong>
-            </td>
-            {columns.slice(2).map((col) => (
-              <td key={col.key}>-</td>
-            ))}
+            {columns.map((col) => {
+              if (col.key === 'netTotal') {
+                const netTotalSum = bills.reduce((sum, bill) => {
+                  const data = bill.extractedData || {};
+                  if (data.documentType === 'ledger') {
+                    const billTxn = data.transactions?.find((t: any) =>
+                      t.particulars?.toLowerCase().includes('bill') && t.debit > 0
+                    );
+                    return sum + (data.netTotal || billTxn?.debit || bill.totalAmount || 0);
+                  }
+                  return sum + (data.netTotal || bill.totalAmount || 0);
+                }, 0);
+                return (
+                  <td key={col.key}>
+                    <strong>{netTotalSum.toLocaleString()}</strong>
+                  </td>
+                );
+              }
+              if (col.key === 'total') {
+                const totalSum = bills.reduce((sum, bill) => {
+                  const data = bill.extractedData || {};
+                  if (data.documentType === 'ledger') {
+                    const billTxn = data.transactions?.find((t: any) =>
+                      t.particulars?.toLowerCase().includes('bill') && t.debit > 0
+                    );
+                    return sum + (data.netTotal || billTxn?.debit || 0);
+                  }
+                  return sum + (data.total || 0);
+                }, 0);
+                return (
+                  <td key={col.key}>
+                    <strong>{totalSum.toLocaleString()}</strong>
+                  </td>
+                );
+              }
+              if (col.key === 'discount') {
+                const discountSum = bills.reduce(
+                  (sum, bill) => sum + (bill.extractedData?.discount || 0),
+                  0
+                );
+                return (
+                  <td key={col.key}>
+                    <strong>{discountSum.toLocaleString()}</strong>
+                  </td>
+                );
+              }
+              if (col.key === 'partyName') {
+                return <td key={col.key}><strong>TOTAL</strong></td>;
+              }
+              return <td key={col.key}>-</td>;
+            })}
             <td></td>
           </tr>
         </tfoot>

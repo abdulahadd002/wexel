@@ -7,8 +7,7 @@ import {
   LoginPage,
   RegisterPage,
   HomePage,
-  PhotosPage,
-  SettingsPage,
+  UploadPage,
 } from './pages';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -39,18 +38,10 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/photos"
+        path="/upload"
         element={
           <ProtectedRoute>
-            <PhotosPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute>
-            <SettingsPage />
+            <UploadPage />
           </ProtectedRoute>
         }
       />

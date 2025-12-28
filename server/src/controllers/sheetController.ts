@@ -29,8 +29,8 @@ export const getSheets = asyncHandler(async (req: AuthRequest, res: Response) =>
 
 export const getSheetByDate = asyncHandler(async (req: AuthRequest, res: Response) => {
   const { date } = req.params;
-  const sheetDate = new Date(date);
-  sheetDate.setHours(0, 0, 0, 0);
+  // Parse date as UTC to avoid timezone issues
+  const sheetDate = new Date(date + 'T00:00:00.000Z');
 
   const sheet = await prisma.dailySheet.findUnique({
     where: {
@@ -41,17 +41,16 @@ export const getSheetByDate = asyncHandler(async (req: AuthRequest, res: Respons
     },
   });
 
+  // Query bills for the entire day (UTC)
+  const startOfDay = new Date(date + 'T00:00:00.000Z');
+  const endOfDay = new Date(date + 'T23:59:59.999Z');
+
   const bills = await prisma.bill.findMany({
     where: {
       userId: req.userId,
-      billDate: sheetDate,
-    },
-    include: {
-      contact: {
-        select: {
-          displayName: true,
-          phoneNumber: true,
-        },
+      billDate: {
+        gte: startOfDay,
+        lte: endOfDay,
       },
     },
     orderBy: { createdAt: 'asc' },
@@ -68,20 +67,15 @@ export const getSheetByDate = asyncHandler(async (req: AuthRequest, res: Respons
 
 export const exportSheet = asyncHandler(async (req: AuthRequest, res: Response) => {
   const { date } = req.params;
-  const sheetDate = new Date(date);
-  sheetDate.setHours(0, 0, 0, 0);
+  const startOfDay = new Date(date + 'T00:00:00.000Z');
+  const endOfDay = new Date(date + 'T23:59:59.999Z');
 
   const bills = await prisma.bill.findMany({
     where: {
       userId: req.userId,
-      billDate: sheetDate,
-    },
-    include: {
-      contact: {
-        select: {
-          displayName: true,
-          phoneNumber: true,
-        },
+      billDate: {
+        gte: startOfDay,
+        lte: endOfDay,
       },
     },
     orderBy: { createdAt: 'asc' },
@@ -91,7 +85,7 @@ export const exportSheet = asyncHandler(async (req: AuthRequest, res: Response) 
     throw createError('No bills found for this date', 404);
   }
 
-  const buffer = await generateExcelSheet(bills, sheetDate);
+  const buffer = await generateExcelSheet(bills, startOfDay);
 
   const filename = `wexel-sheet-${date}.xlsx`;
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

@@ -4,8 +4,7 @@ import './Sidebar.css';
 
 const navItems = [
   { path: '/', label: 'Sheets', icon: '📊' },
-  { path: '/photos', label: 'Photos', icon: '📷' },
-  { path: '/settings', label: 'Settings', icon: '⚙️' },
+  { path: '/upload', label: 'Upload', icon: '📤' },
 ];
 
 export function Sidebar() {

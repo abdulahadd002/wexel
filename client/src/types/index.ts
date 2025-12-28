@@ -11,27 +11,14 @@ export interface AuthState {
   isLoading: boolean;
 }
 
-export interface Contact {
-  id: string;
-  phoneNumber: string;
-  displayName: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface Bill {
   id: string;
-  imageUrl: string;
+  imagePath: string;
   extractedData: Record<string, any>;
   totalAmount: number | null;
   billDate: string;
   processedAt: string | null;
   createdAt: string;
-  contact: {
-    displayName: string;
-    phoneNumber: string;
-  };
 }
 
 export interface DailySheet {
@@ -42,30 +29,10 @@ export interface DailySheet {
   updatedAt: string;
 }
 
-export interface Photo {
-  id: string;
-  imageUrl: string;
-  billDate: string;
-  processedAt: string | null;
-  createdAt: string;
-  contact?: {
-    id: string;
-    displayName: string;
-    phoneNumber: string;
-  };
-}
-
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: {
     message: string;
   };
-}
-
-export interface PaginationInfo {
-  page: number;
-  limit: number;
-  total: number;
-  pages: number;
 }
